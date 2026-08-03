@@ -87,10 +87,6 @@ button:disabled { cursor: wait; opacity: 0.58; }
 .input-hint { margin: 14px 0 0; color: #7a8798; font-size: 11.5px; line-height: 1.6; }
 
 .error-banner { padding: 14px 16px; border: 1px solid #edc2bd; border-radius: 11px; background: #fff4f2; color: #a83f36; font-size: 13px; box-shadow: var(--shadow); }
-.result-placeholder { min-height: 180px; display: flex; align-items: center; justify-content: center; gap: 18px; color: #5f6e83; text-align: left; }
-.result-placeholder .placeholder-mark { display: grid; place-items: center; width: 68px; height: 68px; border-radius: 50%; border: 8px solid #dce8ec; color: #4a8588; font-size: 18px; font-weight: 800; }
-.result-placeholder strong { color: #334155; font-size: 16px; }
-.result-placeholder p { margin: 6px 0 0; font-size: 12.5px; }
 .risk-layout { display: grid; grid-template-columns: 178px 1fr; gap: 24px; align-items: center; }
 .risk-ring { width: 166px; aspect-ratio: 1; padding: 13px; border-radius: 50%; background: conic-gradient(var(--risk-color,#177e78) var(--risk-angle,0deg),#e7edf2 0deg); box-shadow: inset 0 0 0 1px rgba(45,64,88,.04); }
 .risk-ring-inner { width: 100%; height: 100%; display: grid; align-content: center; justify-items: center; border-radius: 50%; background: white; box-shadow: 0 5px 22px rgba(31,48,73,.10); }
@@ -111,7 +107,6 @@ button:disabled { cursor: wait; opacity: 0.58; }
 .heading-main { display: flex; gap: 12px; align-items: flex-start; }
 .download-actions { display: flex; gap: 7px; }
 .download-btn { padding: 7px 10px; border: 1px solid #cbd6e2; border-radius: 8px; background: white; color: #465a72; font-size: 11.5px; font-weight: 650; }
-.chart-empty { display: grid; place-items: center; min-height: 260px; border: 1px dashed #cad6e2; border-radius: 12px; background: #fafcfd; color: #7a8798; font-size: 13px; text-align: center; padding: 30px; }
 .shap-chart { display: grid; gap: 14px; padding: 8px 2px 4px; }
 .shap-row { display: grid; grid-template-columns: 170px minmax(220px,1fr) 78px; gap: 13px; align-items: center; min-height: 50px; }
 .shap-label { display: grid; gap: 3px; min-width: 0; }
