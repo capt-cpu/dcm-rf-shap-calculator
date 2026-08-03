@@ -83,15 +83,10 @@
     <div class="results-column">
       <div id="error-banner" class="error-banner" role="alert" hidden></div>
 
-      <section class="panel-card result-card" aria-labelledby="prediction-title">
+      <section id="prediction-section" class="panel-card result-card" aria-labelledby="prediction-title" hidden>
         <div class="panel-heading">
           <div class="step-badge">02</div>
           <div><h2 id="prediction-title">个体预测</h2><p>阳性结局：术后1年未达到严重程度特异MCID</p></div>
-        </div>
-
-        <div id="result-placeholder" class="result-placeholder">
-          <div class="placeholder-mark">RF</div>
-          <div><strong>等待计算</strong><p>填写或确认左侧指标后，点击“计算风险并生成SHAP”。</p></div>
         </div>
 
         <div id="risk-content" hidden>
@@ -115,7 +110,7 @@
         </div>
       </section>
 
-      <section class="panel-card shap-card" aria-labelledby="shap-title">
+      <section id="shap-section" class="panel-card shap-card" aria-labelledby="shap-title" hidden>
         <div class="panel-heading heading-with-actions">
           <div class="heading-main">
             <div class="step-badge">03</div>
@@ -127,7 +122,6 @@
           </div>
         </div>
 
-        <div id="shap-empty" class="chart-empty">完成一次计算后，这里将显示患者级SHAP贡献图。</div>
         <div id="shap-chart" class="shap-chart" hidden aria-label="患者级SHAP贡献图"></div>
         <p id="shap-caption" class="shap-caption" hidden></p>
 
