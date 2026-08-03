@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="基于锁定随机森林模型的DCM术后1年不良恢复风险预测与患者级SHAP解释工具。">
+  <meta name="theme-color" content="#0e2a47">
+  <meta property="og:title" content="DCM术后恢复 RF–SHAP预测工具">
+  <meta property="og:description" content="7项术前指标、锁定随机森林、浏览器端精确SHAP解释。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://capt-cpu.github.io/dcm-rf-shap-calculator/">
+  <meta property="og:image" content="https://capt-cpu.github.io/dcm-rf-shap-calculator/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>DCM术后恢复 RF–SHAP预测工具</title>
+  <link rel="stylesheet" href="www/static.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="eyebrow"><span class="eyebrow-dot"></span>LOCKED RANDOM FOREST · EXACT INDIVIDUAL SHAP</div>
+      <div class="hero-title-row">
+        <div>
+          <h1>DCM术后1年不良恢复风险预测</h1>
+          <p>输入7项常规术前指标，获得锁定随机森林的个体风险概率，并查看每项指标如何推高或降低本次预测。</p>
+        </div>
+        <div id="model-status" class="model-status checking" role="status" aria-live="polite">
+          <span class="status-dot"></span><span id="model-status-text">正在核对模型…</span>
+        </div>
+      </div>
+      <div class="hero-chips" aria-label="模型信息">
+        <span>开发队列 n=601</span>
+        <span>前瞻性时间验证 n=183</span>
+        <span>前瞻验证 AUC=0.837</span>
+        <span>300棵决策树</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <aside class="input-panel panel-card" aria-labelledby="input-title">
+      <div class="panel-heading">
+        <div class="step-badge">01</div>
+        <div><h2 id="input-title">术前指标</h2><p>请按患者术前状态填写</p></div>
+      </div>
+
+      <section class="input-section" aria-labelledby="clinical-heading">
+        <h3 id="clinical-heading">病程与临床表现</h3>
+        <label for="length">症状持续时间（月）</label>
+        <input id="length" type="number" step="1" inputmode="decimal">
+
+        <label for="cotton">行走时足底踩棉感</label>
+        <select id="cotton"><option value="0">无</option><option value="1">有</option></select>
+
+        <label for="fine">手部笨拙/精细运动障碍</label>
+        <select id="fine"><option value="0">无</option><option value="1">有</option></select>
+
+        <label for="Hoffman">Hoffmann征</label>
+        <select id="Hoffman"><option value="0">阴性</option><option value="1">阳性</option></select>
+      </section>
+
+      <section class="input-section" aria-labelledby="lab-heading">
+        <h3 id="lab-heading">神经功能与血液指标</h3>
+        <label for="preJOA">术前mJOA评分（分）</label>
+        <input id="preJOA" type="number" step="1" inputmode="numeric">
+
+        <label for="MLR">单核细胞/淋巴细胞比值（MLR）</label>
+        <input id="MLR" type="number" step="0.01" inputmode="decimal">
+
+        <label for="WBC">白细胞计数（WBC，×10<sup>9</sup>/L）</label>
+        <input id="WBC" type="number" step="0.1" inputmode="decimal">
+      </section>
+
+      <div class="button-row">
+        <button id="calculate" class="primary-action" type="button">
+          <span id="calculate-label">计算风险并生成SHAP</span>
+          <span id="calculate-progress" class="button-progress" aria-hidden="true"></span>
+        </button>
+        <button id="reset" class="secondary-action" type="button">恢复中位数示例</button>
+      </div>
+      <p class="input-hint">输入范围限定为开发队列的观测范围。所有计算均在当前浏览器完成，网站不会上传或保存患者数据。</p>
+    </aside>
+
+    <div class="results-column">
+      <div id="error-banner" class="error-banner" role="alert" hidden></div>
+
+      <section class="panel-card result-card" aria-labelledby="prediction-title">
+        <div class="panel-heading">
+          <div class="step-badge">02</div>
+          <div><h2 id="prediction-title">个体预测</h2><p>阳性结局：术后1年未达到严重程度特异MCID</p></div>
+        </div>
+
+        <div id="result-placeholder" class="result-placeholder">
+          <div class="placeholder-mark">RF</div>
+          <div><strong>等待计算</strong><p>填写或确认左侧指标后，点击“计算风险并生成SHAP”。</p></div>
+        </div>
+
+        <div id="risk-content" hidden>
+          <div class="risk-layout">
+            <div id="risk-ring" class="risk-ring" aria-label="不良恢复预测概率">
+              <div class="risk-ring-inner"><span id="risk-number" class="risk-number">—</span><span class="risk-caption">不良恢复概率</span></div>
+            </div>
+            <div class="risk-copy">
+              <div id="classification-pill" class="classification-pill"></div>
+              <h3 id="risk-heading"></h3>
+              <p id="risk-description"></p>
+            </div>
+          </div>
+          <div class="formula-strip" aria-label="SHAP加和公式">
+            <div><span>参考基线风险</span><strong id="baseline-value">—</strong></div>
+            <div class="formula-symbol">+</div>
+            <div><span>7项SHAP贡献合计</span><strong id="shap-sum-value">—</strong></div>
+            <div class="formula-symbol">=</div>
+            <div><span>个体预测风险</span><strong id="formula-risk-value">—</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel-card shap-card" aria-labelledby="shap-title">
+        <div class="panel-heading heading-with-actions">
+          <div class="heading-main">
+            <div class="step-badge">03</div>
+        <div><h2 id="shap-title">个体SHAP解释</h2><p>正值推高不良恢复风险，负值降低风险；使用隐私保护合成参考分布</p></div>
+          </div>
+          <div class="download-actions">
+            <button id="download-png" class="download-btn" type="button" disabled>下载PNG</button>
+            <button id="download-csv" class="download-btn" type="button" disabled>下载CSV</button>
+          </div>
+        </div>
+
+        <div id="shap-empty" class="chart-empty">完成一次计算后，这里将显示患者级SHAP贡献图。</div>
+        <div id="shap-chart" class="shap-chart" hidden aria-label="患者级SHAP贡献图"></div>
+        <p id="shap-caption" class="shap-caption" hidden></p>
+
+        <div id="shap-table-wrap" class="shap-table-wrap" hidden>
+          <table class="shap-table">
+            <thead><tr><th>指标</th><th>患者值</th><th>SHAP贡献</th><th>方向</th></tr></thead>
+            <tbody id="shap-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel-card model-note" aria-labelledby="interpret-title">
+        <h2 id="interpret-title">如何解读</h2>
+        <div class="note-grid">
+          <div><h3>风险概率</h3><p>表示模型估计患者术后1年未达到相应MCID的概率。0.50为研究预设分类阈值，不是手术指征阈值。</p></div>
+          <div><h3>SHAP贡献</h3><p>显示各指标对本次预测的方向和幅度。公开网页采用100例隐私保护合成参考样本，因此个体SHAP值可与论文图略有差异，但RF风险概率不变。</p></div>
+          <div><h3>适用边界</h3><p>模型完成了同中心前瞻性时间验证，但尚缺少地理外部验证和临床影响试验，仅供科研与辅助风险沟通。</p></div>
+        </div>
+      </section>
+
+      <div class="safety-banner"><strong>重要：</strong>本工具不能用于拒绝或延迟减压手术，也不能替代脊柱外科医生的综合判断。</div>
+    </div>
+  </main>
+
+  <footer>DCM RF–SHAP research calculator · Locked seven-predictor model · Browser-only processing</footer>
+
+  <noscript><div class="noscript">本网站需要启用JavaScript才能运行RF预测和SHAP解释。</div></noscript>
+  <script src="model/rf-model-data.js"></script>
+  <script src="www/rf-engine.js"></script>
+  <script src="www/site.js"></script>
+</body>
+</html>
