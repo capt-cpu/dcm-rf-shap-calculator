@@ -152,9 +152,9 @@
     })).sort((a, b) => Math.abs(b.shap) - Math.abs(a.shap));
 
     lastResult = { values, ...shapResult, rows, elapsedMs };
-    byId("result-placeholder").hidden = true;
+    byId("prediction-section").hidden = false;
+    byId("shap-section").hidden = false;
     byId("risk-content").hidden = false;
-    byId("shap-empty").hidden = true;
     byId("shap-chart").hidden = false;
     byId("shap-caption").hidden = false;
     byId("shap-table-wrap").hidden = false;
