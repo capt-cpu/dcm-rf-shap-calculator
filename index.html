@@ -23,9 +23,6 @@
           <h1>DCM术后1年不良恢复风险预测</h1>
           <p>输入7项常规术前指标，获得锁定随机森林的个体风险概率，并查看每项指标如何推高或降低本次预测。</p>
         </div>
-        <div id="model-status" class="model-status checking" role="status" aria-live="polite">
-          <span class="status-dot"></span><span id="model-status-text">正在核对模型…</span>
-        </div>
       </div>
       <div class="hero-chips" aria-label="模型信息">
         <span>开发队列 n=601</span>
@@ -48,7 +45,7 @@
         <label for="length">症状持续时间（月）</label>
         <input id="length" type="number" step="1" inputmode="decimal">
 
-        <label for="cotton">行走时足底踩棉感</label>
+        <label for="cotton">脚踩棉花感</label>
         <select id="cotton"><option value="0">无</option><option value="1">有</option></select>
 
         <label for="fine">手部笨拙/精细运动障碍</label>
@@ -86,7 +83,7 @@
       <section id="prediction-section" class="panel-card result-card" aria-labelledby="prediction-title" hidden>
         <div class="panel-heading">
           <div class="step-badge">02</div>
-          <div><h2 id="prediction-title">个体预测</h2><p>阳性结局：术后1年未达到严重程度特异MCID</p></div>
+          <div><h2 id="prediction-title">个体预测</h2><p>阳性结局：术后1年mJOA恢复未达到MCID</p></div>
         </div>
 
         <div id="risk-content" hidden>
