@@ -4,11 +4,11 @@
   const model = window.RF_MODEL_DATA;
   const engine = window.RFEngine.create(model);
   const featureLabels = [
-    "症状持续时间", "足底踩棉感", "手部精细运动障碍",
+    "症状持续时间", "脚踩棉花感", "手部精细运动障碍",
     "Hoffmann征", "术前mJOA", "MLR", "WBC"
   ];
   const featureLongLabels = [
-    "症状持续时间", "行走时足底踩棉感", "手部笨拙/精细运动障碍",
+    "症状持续时间", "脚踩棉花感", "手部笨拙/精细运动障碍",
     "Hoffmann征", "术前mJOA评分", "单核细胞/淋巴细胞比值（MLR）",
     "白细胞计数（WBC）"
   ];
@@ -314,17 +314,11 @@
   }
 
   function verifyBrowserModel() {
-    const status = byId("model-status");
-    const statusText = byId("model-status-text");
     try {
       const verification = engine.verifyFixtures(1e-12);
       if (!verification.passed) throw new Error(`maximum error ${verification.maximumError}`);
-      status.className = "model-status verified";
-      statusText.textContent = `浏览器模型已核对（${verification.fixtures}例）`;
       calculateButton.disabled = false;
     } catch (error) {
-      status.className = "model-status failed";
-      statusText.textContent = "模型核对失败";
       calculateButton.disabled = true;
       showError("浏览器模型与原R模型核对失败，本次未启用预测。")
     }
