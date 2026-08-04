@@ -56,12 +56,6 @@ button:disabled { cursor: wait; opacity: 0.58; }
 .hero-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 .hero-chips span { padding: 6px 11px; border: 1px solid rgba(255,255,255,.20); border-radius: 999px; background: rgba(255,255,255,.07); color: #edf7f8; font-size: 12px; font-weight: 600; }
 
-.model-status { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
-.model-status.checking { background: rgba(255,255,255,.09); color: #e5eef4; }
-.model-status.verified { background: rgba(76,192,184,.16); color: #d6fffb; border: 1px solid rgba(109,226,216,.25); }
-.model-status.failed { background: rgba(208,90,78,.2); color: #ffe2dd; border: 1px solid rgba(255,176,165,.25); }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-
 .page-shell { width: min(1180px, calc(100% - 40px)); margin: 28px auto 34px; display: grid; grid-template-columns: 355px minmax(0,1fr); gap: 22px; align-items: start; }
 .panel-card { background: var(--paper); border: 1px solid rgba(195,207,219,.78); border-radius: 16px; box-shadow: var(--shadow); }
 .input-panel { position: sticky; top: 18px; padding: 23px; }
