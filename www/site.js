@@ -4,13 +4,13 @@
   const model = window.RF_MODEL_DATA;
   const engine = window.RFEngine.create(model);
   const featureLabels = [
-    "症状持续时间", "脚踩棉花感", "手部精细运动障碍",
-    "Hoffmann征", "术前mJOA", "MLR", "WBC"
+    "Duration of Symptoms (m)", "Feeling of Walking on Cotton", "Clumsy hands",
+    "Positive Hoffmann sign", "Preoperative mJOA score", "MLR", "WBC"
   ];
   const featureLongLabels = [
-    "症状持续时间", "脚踩棉花感", "手部笨拙/精细运动障碍",
-    "Hoffmann征", "术前mJOA评分", "单核细胞/淋巴细胞比值（MLR）",
-    "白细胞计数（WBC）"
+    "Duration of Symptoms (m)", "Feeling of Walking on Cotton", "Clumsy hands",
+    "Positive Hoffmann sign", "Preoperative mJOA score", "Monocyte-to-lymphocyte ratio (MLR)",
+    "White blood cell count (WBC)"
   ];
   const inputIds = model.features;
   let lastResult = null;
@@ -22,10 +22,10 @@
   const calculateProgress = byId("calculate-progress");
 
   function formatValue(index, value) {
-    if (index === 0) return `${value.toFixed(1)}个月`;
-    if (index === 1 || index === 2) return value === 1 ? "有" : "无";
-    if (index === 3) return value === 1 ? "阳性" : "阴性";
-    if (index === 4) return `${value.toFixed(0)}分`;
+    if (index === 0) return `${value.toFixed(1)} months`;
+    if (index === 1 || index === 2) return value === 1 ? "Yes" : "No";
+    if (index === 3) return value === 1 ? "Positive" : "Negative";
+    if (index === 4) return `${value.toFixed(0)} points`;
     if (index === 5) return value.toFixed(3);
     if (index === 6) return `${value.toFixed(2)} ×10⁹/L`;
     return String(value);
@@ -52,15 +52,15 @@
     for (let index = 0; index < values.length; index += 1) {
       const value = values[index];
       const range = model.ranges[index];
-      if (!Number.isFinite(value)) throw new Error(`请填写${featureLongLabels[index]}。`);
+      if (!Number.isFinite(value)) throw new Error(`Please enter ${featureLongLabels[index]}.`);
       if (value < range[0] || value > range[1]) {
-        throw new Error(`${featureLongLabels[index]}应位于开发队列范围 ${range[0]}–${range[1]} 内。`);
+        throw new Error(`${featureLongLabels[index]} should be within the range observed in the development cohort: ${range[0]}–${range[1]}.`);
       }
     }
     for (const index of [1, 2, 3]) {
-      if (![0, 1].includes(values[index])) throw new Error(`${featureLongLabels[index]}必须选择“无/有”或“阴性/阳性”。`);
+      if (![0, 1].includes(values[index])) throw new Error(`${featureLongLabels[index]} must be set to No/Yes or Negative/Positive.`);
     }
-    if (!Number.isInteger(values[4])) throw new Error("术前mJOA评分应为整数。")
+    if (!Number.isInteger(values[4])) throw new Error("Preoperative mJOA score must be an integer.")
   }
 
   function showError(message) {
@@ -78,7 +78,7 @@
     calculateButton.disabled = isBusy;
     byId("reset").disabled = isBusy;
     calculateProgress.style.width = `${Math.max(0, Math.min(1, progress || 0)) * 100}%`;
-    calculateLabel.textContent = isBusy ? "正在计算精确SHAP…" : "计算风险并生成SHAP";
+    calculateLabel.textContent = isBusy ? "Computing exact SHAP…" : "Calculate risk and generate SHAP";
   }
 
   function nextFrame() {
@@ -86,7 +86,7 @@
   }
 
   function directionText(value) {
-    return value >= 0 ? "推高风险" : "降低风险";
+    return value >= 0 ? "Increases risk" : "Decreases risk";
   }
 
   function renderChart(rows, baseline, probability) {
@@ -120,7 +120,7 @@
     });
 
     byId("shap-caption").textContent =
-      `合成参考基线风险 ${(100 * baseline).toFixed(1)}% + SHAP贡献 = 个体预测风险 ${(100 * probability).toFixed(1)}%。横轴单位为预测概率百分点。`;
+      `Synthetic reference baseline risk ${(100 * baseline).toFixed(1)}% + SHAP contribution = individual predicted risk ${(100 * probability).toFixed(1)}%. The horizontal axis unit is percentage points of predicted probability.`;
   }
 
   function renderTable(rows) {
@@ -132,7 +132,7 @@
       tr.innerHTML = `
         <td>${row.label}</td>
         <td>${row.displayValue}</td>
-        <td class="contribution-${signClass}">${row.shap >= 0 ? "+" : ""}${(100 * row.shap).toFixed(2)}百分点</td>
+        <td class="contribution-${signClass}">${row.shap >= 0 ? "+" : ""}${(100 * row.shap).toFixed(2)} percentage points</td>
         <td><span class="direction-tag ${signClass}">${directionText(row.shap)}</span></td>`;
       body.append(tr);
     });
@@ -170,17 +170,17 @@
     const pill = byId("classification-pill");
     pill.className = `classification-pill ${above ? "above" : "below"}`;
     pill.textContent = above
-      ? "达到预设阈值：模型分类为不良恢复"
-      : "低于预设阈值：模型分类为有利恢复";
+      ? "At or above the prespecified threshold: model classification is unfavorable recovery"
+      : "Below the prespecified threshold: model classification is favorable recovery";
     byId("risk-heading").textContent = above
-      ? "建议加强术前风险沟通与术后随访"
-      : "预测风险低于研究分类阈值";
+      ? "Enhanced preoperative risk communication and postoperative follow-up are recommended"
+      : "Predicted risk is below the study classification threshold";
     byId("risk-description").textContent =
-      `模型概率为 ${(100 * probability).toFixed(1)}%，研究预设分类阈值为 ${(100 * model.threshold).toFixed(0)}%。` +
-      `计算用时 ${(elapsedMs / 1000).toFixed(2)}秒；该概率用于风险分层，不代表患者必然发生或不发生不良恢复。`;
+      `The model probability is ${(100 * probability).toFixed(1)}%, and the prespecified study classification threshold is ${(100 * model.threshold).toFixed(0)}%. ` +
+      `Calculation time was ${(elapsedMs / 1000).toFixed(2)} seconds. This probability is used for risk stratification and does not mean that unfavorable recovery will or will not necessarily occur.`;
 
     byId("baseline-value").textContent = `${(100 * shapResult.baseline).toFixed(1)}%`;
-    byId("shap-sum-value").textContent = `${shapResult.shapSum >= 0 ? "+" : ""}${(100 * shapResult.shapSum).toFixed(1)}百分点`;
+    byId("shap-sum-value").textContent = `${shapResult.shapSum >= 0 ? "+" : ""}${(100 * shapResult.shapSum).toFixed(1)} percentage points`;
     byId("formula-risk-value").textContent = `${(100 * probability).toFixed(1)}%`;
     renderChart(rows, shapResult.baseline, probability);
     renderTable(rows);
@@ -204,14 +204,14 @@
       const elapsed = performance.now() - start;
 
       if (Math.abs(directProbability - result.probability) > 1e-12) {
-        throw new Error("网页RF与SHAP计算结果不一致，已停止显示。")
+        throw new Error("The browser-based RF and SHAP results are inconsistent; display has been stopped.")
       }
       if (Math.abs(result.additivityError) > 1e-10) {
-        throw new Error("SHAP加和校验未通过，已停止显示。")
+        throw new Error("The SHAP additivity check failed; display has been stopped.")
       }
       renderResult(values, result, elapsed);
     } catch (error) {
-      showError(error.message || "计算失败，请刷新页面后重试。")
+      showError(error.message || "Calculation failed. Please refresh the page and try again.")
     } finally {
       setBusy(false, 0);
     }
@@ -260,10 +260,10 @@
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#172033";
     ctx.font = 'bold 58px "Microsoft YaHei", sans-serif';
-    ctx.fillText("个体RF–SHAP解释", 110, 105);
+    ctx.fillText("Individual RF–SHAP explanation", 110, 105);
     ctx.fillStyle = "#64748b";
     ctx.font = '30px "Microsoft YaHei", sans-serif';
-    ctx.fillText("正值推高不良恢复风险，负值降低风险", 110, 158);
+    ctx.fillText("Positive values increase the risk of unfavorable recovery, whereas negative values decrease it", 110, 158);
 
     const rows = lastResult.rows;
     const maxAbs = Math.max(...rows.map((row) => Math.abs(row.shap)), 0.000001);
@@ -303,10 +303,10 @@
     ctx.fillStyle = "#64748b";
     ctx.font = '27px "Microsoft YaHei", sans-serif';
     ctx.fillText(
-      `合成参考基线风险 ${(100 * lastResult.baseline).toFixed(1)}% + SHAP贡献 = 个体预测风险 ${(100 * lastResult.probability).toFixed(1)}%`,
+      `Synthetic reference baseline risk ${(100 * lastResult.baseline).toFixed(1)}% + SHAP contribution = individual predicted risk ${(100 * lastResult.probability).toFixed(1)}%`,
       110, 1285
     );
-    ctx.fillText("横轴单位：预测概率百分点；SHAP为模型归因，不代表因果效应。", 110, 1330);
+    ctx.fillText("Horizontal axis unit: percentage points of predicted probability; SHAP is model attribution, not a causal effect.", 110, 1330);
 
     canvas.toBlob((blob) => {
       if (blob) downloadBlob(`RF_SHAP_patient_${timestamp()}.png`, blob);
@@ -320,7 +320,7 @@
       calculateButton.disabled = false;
     } catch (error) {
       calculateButton.disabled = true;
-      showError("浏览器模型与原R模型核对失败，本次未启用预测。")
+      showError("The browser model failed verification against the original R model; prediction has not been enabled.")
     }
   }
 

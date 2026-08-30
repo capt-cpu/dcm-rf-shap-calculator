@@ -8,7 +8,7 @@
 
   function create(model) {
     if (!model || !Array.isArray(model.features) || !Array.isArray(model.trees)) {
-      throw new Error("RF模型数据不完整。")
+      throw new Error("RF model data are incomplete.")
     }
 
     const featureCount = model.features.length;
@@ -18,7 +18,7 @@
 
     function standardize(raw) {
       if (!Array.isArray(raw) || raw.length !== featureCount) {
-        throw new Error("患者指标数量与锁定模型不一致。")
+        throw new Error("The number of patient predictors does not match the locked model.")
       }
       return raw.map((value, index) =>
         (Number(value) - model.means[index]) / model.standardDeviations[index]
