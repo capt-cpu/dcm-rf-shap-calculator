@@ -54,7 +54,7 @@
       const range = model.ranges[index];
       if (!Number.isFinite(value)) throw new Error(`Please enter ${featureLongLabels[index]}.`);
       if (value < range[0] || value > range[1]) {
-        throw new Error(`${featureLongLabels[index]} should be within the range observed in the development cohort: ${range[0]}–${range[1]}.`);
+        throw new Error(`${featureLongLabels[index]} should be within the range observed in the training cohort: ${range[0]}–${range[1]}.`);
       }
     }
     for (const index of [1, 2, 3]) {

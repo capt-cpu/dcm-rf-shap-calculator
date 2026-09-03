@@ -25,9 +25,9 @@
         </div>
       </div>
       <div class="hero-chips" aria-label="Model information">
-        <span>Development cohort n=601</span>
-        <span>Prospective temporal validation n=183</span>
-        <span>Prospective validation AUC=0.837</span>
+        <span>Training cohort n=421</span>
+        <span>Temporal validation n=183</span>
+        <span>Temporal validation AUC=0.840</span>
         <span>300 decision trees</span>
       </div>
     </div>
@@ -74,7 +74,7 @@
         </button>
         <button id="reset" class="secondary-action" type="button">Restore median example</button>
       </div>
-      <p class="input-hint">Input ranges are restricted to those observed in the development cohort. All calculations are performed in the current browser; the website does not upload or store patient data.</p>
+      <p class="input-hint">Input ranges are restricted to those observed in the training cohort. All calculations are performed in the current browser; the website does not upload or store patient data.</p>
     </aside>
 
     <div class="results-column">
@@ -135,7 +135,7 @@
         <div class="note-grid">
           <div><h3>Risk probability</h3><p>Represents the model-estimated probability that the patient will fail to achieve the corresponding MCID 1 year after surgery. A threshold of 0.50 is the prespecified classification threshold for the study, not a threshold for surgical indication.</p></div>
           <div><h3>SHAP contribution</h3><p>Shows the direction and magnitude of each predictor's contribution to this prediction. To protect patient privacy, the public website uses synthetic reference samples generated from the training-cohort distribution to calculate SHAP. Changing the reference background may alter the SHAP baseline and individual predictor contributions but will not change the RF prediction probability.</p></div>
-          <div><h3>Scope of application</h3><p>The model underwent same-center prospective temporal validation but still lacks geographic external validation and a clinical impact trial. It is intended only for research and supplementary risk communication.</p></div>
+          <div><h3>Scope of application</h3><p>The model underwent same-center temporal validation but still lacks geographic external validation and a clinical impact trial. It is intended only for research and supplementary risk communication.</p></div>
         </div>
       </section>
 
@@ -146,7 +146,7 @@
   <footer>DCM RF–SHAP research calculator · Locked seven-predictor model · Browser-only processing</footer>
 
   <noscript><div class="noscript">JavaScript must be enabled for this website to run RF prediction and SHAP explanation.</div></noscript>
-  <script src="model/rf-model-data.js"></script>
+  <script src="model/rf-model-data.js?v=e5086788"></script>
   <script src="www/rf-engine.js"></script>
   <script src="www/site.js"></script>
 </body>
