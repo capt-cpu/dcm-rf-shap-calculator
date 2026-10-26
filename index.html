@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A tool for predicting the risk of unfavorable recovery 1 year after DCM surgery and providing patient-level SHAP explanations based on a locked random forest model.">
+  <meta name="description" content="A tool for predicting the risk of unfavorable recovery 1 year after DCM surgery and providing patient-level SHAP explanations based on a locked random-forest pipeline.">
   <meta name="theme-color" content="#0e2a47">
   <meta property="og:title" content="DCM Postoperative Recovery RF–SHAP Prediction Tool">
-  <meta property="og:description" content="Seven preoperative predictors, a locked random forest, and exact browser-based SHAP explanations.">
+  <meta property="og:description" content="Seven preoperative predictors, a locked random-forest pipeline, and exact browser-based SHAP explanations.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://capt-cpu.github.io/dcm-rf-shap-calculator/">
   <meta property="og:image" content="https://capt-cpu.github.io/dcm-rf-shap-calculator/og-en.png">
   <meta name="twitter:card" content="summary_large_image">
   <title>DCM Postoperative Recovery RF–SHAP Prediction Tool</title>
-  <link rel="stylesheet" href="www/static.css">
+  <link rel="stylesheet" href="www/static.css?v=20261025-mi20-v2">
 </head>
 <body>
   <header class="hero">
@@ -21,14 +21,14 @@
       <div class="hero-title-row">
         <div>
           <h1>Risk prediction of unfavorable recovery 1 year after DCM surgery</h1>
-          <p>Enter seven routine preoperative predictors to obtain an individual risk probability from the locked random forest and see how each predictor increases or decreases this prediction.</p>
+          <p>Enter seven routine preoperative predictors to obtain an individual risk probability from the locked random-forest pipeline and see how each predictor increases or decreases this prediction.</p>
         </div>
       </div>
       <div class="hero-chips" aria-label="Model information">
         <span>Training cohort n=421</span>
         <span>Temporal validation n=183</span>
-        <span>Temporal validation AUC=0.840</span>
-        <span>300 decision trees</span>
+        <span>Temporal validation AUC=0.850</span>
+        <span>20 RF fits × 300 trees</span>
       </div>
     </div>
   </header>
@@ -43,7 +43,7 @@
       <section class="input-section" aria-labelledby="clinical-heading">
         <h3 id="clinical-heading">Symptom duration and clinical manifestations</h3>
         <label for="length">Duration of Symptoms (m)</label>
-        <input id="length" type="number" step="1" inputmode="decimal">
+        <input id="length" type="number" step="1" inputmode="decimal" required>
 
         <label for="cotton">Feeling of Walking on Cotton</label>
         <select id="cotton"><option value="0">No</option><option value="1">Yes</option></select>
@@ -58,23 +58,22 @@
       <section class="input-section" aria-labelledby="lab-heading">
         <h3 id="lab-heading">Neurological function and hematological measures</h3>
         <label for="preJOA">Preoperative mJOA score</label>
-        <input id="preJOA" type="number" step="1" inputmode="numeric">
+        <input id="preJOA" type="number" step="1" inputmode="numeric" required>
 
         <label for="MLR">Monocyte-to-lymphocyte ratio (MLR)</label>
-        <input id="MLR" type="number" step="0.01" inputmode="decimal">
+        <input id="MLR" type="number" step="0.01" inputmode="decimal" required>
 
         <label for="WBC">White blood cell count (WBC, ×10<sup>9</sup>/L)</label>
-        <input id="WBC" type="number" step="0.1" inputmode="decimal">
+        <input id="WBC" type="number" step="0.1" inputmode="decimal" required>
       </section>
 
       <div class="button-row">
-        <button id="calculate" class="primary-action" type="button">
+        <button id="calculate" class="primary-action" type="button" disabled>
           <span id="calculate-label">Calculate risk and generate SHAP</span>
           <span id="calculate-progress" class="button-progress" aria-hidden="true"></span>
         </button>
         <button id="reset" class="secondary-action" type="button">Restore median example</button>
       </div>
-      <p class="input-hint">Input ranges are restricted to those observed in the training cohort. All calculations are performed in the current browser; the website does not upload or store patient data.</p>
     </aside>
 
     <div class="results-column">
@@ -94,7 +93,6 @@
             <div class="risk-copy">
               <div id="classification-pill" class="classification-pill"></div>
               <h3 id="risk-heading"></h3>
-              <p id="risk-description"></p>
             </div>
           </div>
           <div class="formula-strip" aria-label="SHAP additive formula">
@@ -133,8 +131,8 @@
       <section class="panel-card model-note" aria-labelledby="interpret-title">
         <h2 id="interpret-title">How to interpret</h2>
         <div class="note-grid">
-          <div><h3>Risk probability</h3><p>Represents the model-estimated probability that the patient will fail to achieve the corresponding MCID 1 year after surgery. A threshold of 0.50 is the prespecified classification threshold for the study, not a threshold for surgical indication.</p></div>
-          <div><h3>SHAP contribution</h3><p>Shows the direction and magnitude of each predictor's contribution to this prediction. To protect patient privacy, the public website uses synthetic reference samples generated from the training-cohort distribution to calculate SHAP. Changing the reference background may alter the SHAP baseline and individual predictor contributions but will not change the RF prediction probability.</p></div>
+          <div><h3>Risk probability</h3><p>Represents the model-estimated probability that the patient will fail to achieve the corresponding MCID 1 year after surgery. Probabilities are averaged across 20 frozen RF fits, one per imputed training dataset.</p></div>
+          <div><h3>SHAP contribution</h3><p>Shows the direction and magnitude of each predictor's contribution to this prediction. SHAP explains the same mean probability across the 20 RF fits. To protect patient privacy, the public website uses synthetic reference samples generated from the training-cohort distribution to calculate SHAP. Changing the reference background may alter the SHAP baseline and individual predictor contributions but will not change the RF prediction probability.</p></div>
           <div><h3>Scope of application</h3><p>The model underwent same-center temporal validation but still lacks geographic external validation and a clinical impact trial. It is intended only for research and supplementary risk communication.</p></div>
         </div>
       </section>
@@ -143,11 +141,11 @@
     </div>
   </main>
 
-  <footer>DCM RF–SHAP research calculator · Locked seven-predictor model · Browser-only processing</footer>
+  <footer>DCM RF–SHAP research calculator · Locked seven-predictor pipeline · 20 RF fits · Release 20261025-mi20-v2 · Browser-only processing</footer>
 
   <noscript><div class="noscript">JavaScript must be enabled for this website to run RF prediction and SHAP explanation.</div></noscript>
-  <script src="model/rf-model-data.js?v=e5086788"></script>
-  <script src="www/rf-engine.js"></script>
-  <script src="www/site.js"></script>
+  <script src="model/rf-model-data.js?v=20261025-mi20-v2"></script>
+  <script src="www/rf-engine.js?v=20261025-mi20-v2"></script>
+  <script src="www/site.js?v=20261025-mi20-v2-copy1"></script>
 </body>
 </html>

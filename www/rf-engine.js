@@ -6,29 +6,92 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  function create(model) {
-    if (!model || !Array.isArray(model.features) || !Array.isArray(model.trees)) {
-      throw new Error("RF model data are incomplete.")
+  function decodeForest(bytes, featureCount) {
+    const data = bytes instanceof ArrayBuffer
+      ? new DataView(bytes)
+      : new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let offset = 0;
+    const integer = () => { const value = data.getInt32(offset, true); offset += 4; return value; };
+    const number = () => { const value = data.getFloat64(offset, true); offset += 8; return value; };
+    if (integer() !== 0x32464D52 || integer() !== 1 || integer() !== featureCount) {
+      throw new Error("The RF asset format does not match this calculator.");
     }
+    const treeCount = integer();
+    const positiveClass = integer();
+    if (treeCount !== 300 || positiveClass !== 1) throw new Error("Unexpected RF class mapping or tree count.");
+    const means = Array.from({ length: featureCount }, number);
+    const standardDeviations = Array.from({ length: featureCount }, number);
+    if (!means.every(Number.isFinite) || !standardDeviations.every(v => Number.isFinite(v) && v > 0)) {
+      throw new Error("Invalid frozen preprocessing parameters.");
+    }
+    const trees = [];
+    for (let i = 0; i < treeCount; i += 1) {
+      const n = integer();
+      if (n < 1 || n > 10000) throw new Error("Invalid tree length.");
+      const tree = {};
+      for (const name of ["l", "r", "v"]) tree[name] = Int32Array.from({ length: n }, integer);
+      tree.s = Float64Array.from({ length: n }, number);
+      tree.p = Int32Array.from({ length: n }, integer);
+      for (let node = 0; node < n; node += 1) {
+        if (!Number.isFinite(tree.s[node]) || tree.v[node] < 0 || tree.v[node] > featureCount) {
+          throw new Error("Invalid tree split.");
+        }
+        if (tree.v[node] === 0) {
+          if (![1, 2].includes(tree.p[node])) throw new Error("Invalid terminal class.");
+        } else if (tree.l[node] <= node + 1 || tree.r[node] <= node + 1 || tree.l[node] > n || tree.r[node] > n) {
+          throw new Error("Invalid tree child index.");
+        }
+      }
+      trees.push(tree);
+    }
+    if (offset !== data.byteLength) throw new Error("RF asset has trailing or missing data.");
+    return { means, standardDeviations, positiveClass, trees };
+  }
+
+  async function create(model, options) {
+    if (!model || model.schemaVersion !== 2 || !Array.isArray(model.features)
+      || model.modelCount !== 20 || model.positiveClass !== "Bad"
+      || !Array.isArray(model.forestFiles) || model.forestFiles.length !== 20) {
+      throw new Error("MI20 RF model data are incomplete.");
+    }
+    const config = options || {};
+    const loadForest = config.loadForest || (async function (path) {
+      if (typeof DecompressionStream !== "function") {
+        throw new Error("This calculator requires a current version of Chrome, Edge, Firefox or Safari.");
+      }
+      const assetURL = config.baseURL ? new URL(path, config.baseURL).href : path;
+      const response = await fetch(assetURL, { cache: "force-cache" });
+      if (!response.ok) throw new Error("A frozen RF asset could not be loaded. Please refresh and retry.");
+      const compressed = await response.arrayBuffer();
+      const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
+      return new Response(stream).arrayBuffer();
+    });
 
     const featureCount = model.features.length;
     const fullMask = (1 << featureCount) - 1;
     const factorial = [1];
     for (let i = 1; i <= featureCount; i += 1) factorial[i] = factorial[i - 1] * i;
 
-    function standardize(raw) {
+    const forests = await Promise.all(model.forestFiles.map(async (path) =>
+      decodeForest(await loadForest(path), featureCount)));
+    if (forests.reduce((n, forest) => n + forest.trees.length, 0) !== model.treeCount) {
+      throw new Error("The complete 20-fit RF ensemble was not loaded.");
+    }
+
+    function standardize(raw, forest) {
       if (!Array.isArray(raw) || raw.length !== featureCount) {
         throw new Error("The number of patient predictors does not match the locked model.")
       }
-      return raw.map((value, index) =>
-        (Number(value) - model.means[index]) / model.standardDeviations[index]
-      );
+      if (!raw.every(value => typeof value === "number" && Number.isFinite(value))) {
+        throw new Error("All seven complete numeric inputs are required; missing values are not imputed.");
+      }
+      return raw.map((value, index) => (value - forest.means[index]) / forest.standardDeviations[index]);
     }
 
-    function predictStandardized(values) {
-      let yesVotes = 0;
-      for (let treeIndex = 0; treeIndex < model.trees.length; treeIndex += 1) {
-        const tree = model.trees[treeIndex];
+    function predictStandardized(values, forest) {
+      let badVotes = 0;
+      for (let treeIndex = 0; treeIndex < forest.trees.length; treeIndex += 1) {
+        const tree = forest.trees[treeIndex];
         let node = 0;
         while (tree.v[node] !== 0) {
           const featureIndex = tree.v[node] - 1;
@@ -36,16 +99,18 @@
             ? tree.l[node] - 1
             : tree.r[node] - 1;
         }
-        if (tree.p[node] === 2) yesVotes += 1;
+        if (tree.p[node] === forest.positiveClass) badVotes += 1;
       }
-      return yesVotes / model.trees.length;
+      return badVotes / forest.trees.length;
     }
 
     function predict(raw) {
-      return predictStandardized(standardize(raw));
+      return forests.reduce((sum, forest) =>
+        sum + predictStandardized(standardize(raw, forest), forest), 0) / forests.length;
     }
 
-    const standardizedBackground = model.background.map(standardize);
+    const standardizedBackground = forests.map(forest => model.background.map(row => standardize(row, forest)));
+    const baselineRisk = model.background.reduce((sum, row) => sum + predict(row), 0) / model.background.length;
 
     function verifyFixtures(tolerance) {
       const allowed = tolerance == null ? 1e-12 : tolerance;
@@ -53,9 +118,7 @@
       for (const fixture of model.fixtures) {
         maximumError = Math.max(maximumError, Math.abs(predict(fixture.x) - fixture.p));
       }
-      const baseline = standardizedBackground.reduce(
-        (sum, row) => sum + predictStandardized(row), 0
-      ) / standardizedBackground.length;
+      const baseline = baselineRisk;
       maximumError = Math.max(
         maximumError,
         Math.abs(baseline - model.backgroundExpectedRisk)
@@ -78,19 +141,30 @@
         ? config.yieldFunction
         : function () { return Promise.resolve(); };
 
-      const patient = standardize(raw);
+      const patients = forests.map(forest => standardize(raw, forest));
       const coalitionValues = new Float64Array(1 << featureCount);
 
       for (let mask = 0; mask <= fullMask; mask += 1) {
-        let total = 0;
-        for (let backgroundIndex = 0; backgroundIndex < standardizedBackground.length; backgroundIndex += 1) {
-          const hybrid = standardizedBackground[backgroundIndex].slice();
-          for (let featureIndex = 0; featureIndex < featureCount; featureIndex += 1) {
-            if (mask & (1 << featureIndex)) hybrid[featureIndex] = patient[featureIndex];
-          }
-          total += predictStandardized(hybrid);
+        if (mask === 0) {
+          coalitionValues[mask] = baselineRisk;
+          continue;
         }
-        coalitionValues[mask] = total / standardizedBackground.length;
+        if (mask === fullMask) {
+          coalitionValues[mask] = predict(raw);
+          continue;
+        }
+        let total = 0;
+        for (let fitIndex = 0; fitIndex < forests.length; fitIndex += 1) {
+          const forest = forests[fitIndex];
+          for (let backgroundIndex = 0; backgroundIndex < model.background.length; backgroundIndex += 1) {
+            const hybrid = standardizedBackground[fitIndex][backgroundIndex].slice();
+            for (let featureIndex = 0; featureIndex < featureCount; featureIndex += 1) {
+              if (mask & (1 << featureIndex)) hybrid[featureIndex] = patients[fitIndex][featureIndex];
+            }
+            total += predictStandardized(hybrid, forest);
+          }
+        }
+        coalitionValues[mask] = total / (forests.length * model.background.length);
 
         if (yieldEvery > 0 && mask % yieldEvery === 0) {
           onProgress((mask + 1) / (fullMask + 1));
@@ -180,7 +254,6 @@
       model,
       standardize,
       predict,
-      predictStandardized,
       verifyFixtures,
       exactShap
     };

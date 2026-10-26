@@ -2,7 +2,7 @@
   "use strict";
 
   const model = window.RF_MODEL_DATA;
-  const engine = window.RFEngine.create(model);
+  let engine = null;
   const featureLabels = [
     "Duration of Symptoms (m)", "Feeling of Walking on Cotton", "Clumsy hands",
     "Positive Hoffmann sign", "Preoperative mJOA score", "MLR", "WBC"
@@ -15,6 +15,9 @@
   const inputIds = model.features;
   let lastResult = null;
   let busy = false;
+  let shapWorker = null;
+  let workerRequest = null;
+  let requestId = 0;
 
   const byId = (id) => document.getElementById(id);
   const calculateButton = byId("calculate");
@@ -45,14 +48,17 @@
   }
 
   function readPatient() {
-    return inputIds.map((id) => Number(byId(id).value));
+    return inputIds.map((id) => {
+      const text = byId(id).value.trim();
+      return text === "" ? NaN : Number(text);
+    });
   }
 
   function validatePatient(values) {
     for (let index = 0; index < values.length; index += 1) {
       const value = values[index];
       const range = model.ranges[index];
-      if (!Number.isFinite(value)) throw new Error(`Please enter ${featureLongLabels[index]}.`);
+      if (!Number.isFinite(value)) throw new Error(`Please enter ${featureLongLabels[index]}. All seven inputs are required; do not substitute a guessed value for a missing measurement.`);
       if (value < range[0] || value > range[1]) {
         throw new Error(`${featureLongLabels[index]} should be within the range observed in the training cohort: ${range[0]}–${range[1]}.`);
       }
@@ -77,12 +83,54 @@
     busy = isBusy;
     calculateButton.disabled = isBusy;
     byId("reset").disabled = isBusy;
+    inputIds.forEach(id => { byId(id).disabled = isBusy; });
     calculateProgress.style.width = `${Math.max(0, Math.min(1, progress || 0)) * 100}%`;
-    calculateLabel.textContent = isBusy ? "Computing exact SHAP…" : "Calculate risk and generate SHAP";
+    calculateLabel.textContent = isBusy ? "Computing MI20 SHAP…" : "Calculate risk and generate SHAP";
   }
 
-  function nextFrame() {
-    return new Promise((resolve) => window.requestAnimationFrame(resolve));
+  function startWorker() {
+    return new Promise((resolve, reject) => {
+      shapWorker = new Worker("www/shap-worker.js?v=20261025-mi20-v2");
+      shapWorker.onmessage = event => {
+        const message = event.data;
+        if (message.type === "ready") {
+          if (message.release !== model.release || message.modelMd5 !== model.modelMd5) {
+            reject(new Error("Worker and page model versions do not match. Please refresh."));
+          } else resolve();
+        } else if (message.type === "error") {
+          const error = new Error(message.message || "Local SHAP worker failed.");
+          if (workerRequest) { workerRequest.reject(error); workerRequest = null; }
+          else reject(error);
+        } else if (workerRequest && message.id === workerRequest.id) {
+          if (message.type === "progress") setBusy(true, .05 + message.progress * .93);
+          if (message.type === "result") {
+            workerRequest.resolve(message.result);
+            workerRequest = null;
+          }
+        }
+      };
+      shapWorker.onerror = () => {
+        const error = new Error("The local SHAP worker could not run. Please refresh and retry.");
+        if (workerRequest) { workerRequest.reject(error); workerRequest = null; }
+        else reject(error);
+      };
+    });
+  }
+
+  function workerShap(values) {
+    return new Promise((resolve, reject) => {
+      const id = ++requestId;
+      workerRequest = { id, resolve, reject };
+      shapWorker.postMessage({ id, values });
+    });
+  }
+
+  function clearResults() {
+    lastResult = null;
+    byId("prediction-section").hidden = true;
+    byId("shap-section").hidden = true;
+    byId("download-png").disabled = true;
+    byId("download-csv").disabled = true;
   }
 
   function directionText(value) {
@@ -173,12 +221,8 @@
       ? "At or above the prespecified threshold: model classification is unfavorable recovery"
       : "Below the prespecified threshold: model classification is favorable recovery";
     byId("risk-heading").textContent = above
-      ? "Enhanced preoperative risk communication and postoperative follow-up are recommended"
+      ? "May support more detailed risk communication and follow-up planning"
       : "Predicted risk is below the study classification threshold";
-    byId("risk-description").textContent =
-      `The model probability is ${(100 * probability).toFixed(1)}%, and the prespecified study classification threshold is ${(100 * model.threshold).toFixed(0)}%. ` +
-      `Calculation time was ${(elapsedMs / 1000).toFixed(2)} seconds. This probability is used for risk stratification and does not mean that unfavorable recovery will or will not necessarily occur.`;
-
     byId("baseline-value").textContent = `${(100 * shapResult.baseline).toFixed(1)}%`;
     byId("shap-sum-value").textContent = `${shapResult.shapSum >= 0 ? "+" : ""}${(100 * shapResult.shapSum).toFixed(1)} percentage points`;
     byId("formula-risk-value").textContent = `${(100 * probability).toFixed(1)}%`;
@@ -187,8 +231,9 @@
   }
 
   async function calculate() {
-    if (busy) return;
+    if (busy || !engine) return;
     clearError();
+    clearResults();
     const values = readPatient();
 
     try {
@@ -196,11 +241,7 @@
       setBusy(true, 0.02);
       const directProbability = engine.predict(values);
       const start = performance.now();
-      const result = await engine.exactShap(values, {
-        yieldEvery: 4,
-        yieldFunction: nextFrame,
-        onProgress: (progress) => setBusy(true, 0.05 + progress * 0.93)
-      });
+      const result = await workerShap(values);
       const elapsed = performance.now() - start;
 
       if (Math.abs(directProbability - result.probability) > 1e-12) {
@@ -239,12 +280,13 @@
 
   function downloadCsv() {
     if (!lastResult) return;
-    const header = ["Feature", "Display_feature", "Patient_value", "SHAP_probability", "SHAP_percentage_points", "Direction", "Predicted_probability", "Baseline_probability", "Threshold"];
+    const header = ["Feature", "Display_feature", "Patient_value", "SHAP_probability", "SHAP_percentage_points", "Direction", "Predicted_probability", "Baseline_probability", "Threshold", "Model_release", "Model_MD5", "RF_fits"];
     const lines = [header.join(",")];
     lastResult.rows.forEach((row) => {
       lines.push([
         row.feature, row.rawLabel, row.displayValue, row.shap, 100 * row.shap,
-        directionText(row.shap), lastResult.probability, lastResult.baseline, model.threshold
+        directionText(row.shap), lastResult.probability, lastResult.baseline, model.threshold,
+        model.release, model.modelMd5, model.modelCount
       ].map(csvEscape).join(","));
     });
     downloadBlob(`RF_SHAP_patient_${timestamp()}.csv`, new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
@@ -306,7 +348,8 @@
       `Synthetic reference baseline risk ${(100 * lastResult.baseline).toFixed(1)}% + SHAP contribution = individual predicted risk ${(100 * lastResult.probability).toFixed(1)}%`,
       110, 1285
     );
-    ctx.fillText("Horizontal axis unit: percentage points of predicted probability; SHAP is model attribution, not a causal effect.", 110, 1330);
+    ctx.fillText("Horizontal axis: percentage points; SHAP is model attribution, not a causal effect.", 110, 1330);
+    ctx.fillText(`MI20 RF ensemble (${model.modelCount} fits × ${model.treesPerModel} trees) · Release ${model.release}`, 110, 1375);
 
     canvas.toBlob((blob) => {
       if (blob) downloadBlob(`RF_SHAP_patient_${timestamp()}.png`, blob);
@@ -329,10 +372,26 @@
     if (busy) return;
     setDefaults();
     clearError();
+    clearResults();
   });
   byId("download-csv").addEventListener("click", downloadCsv);
   byId("download-png").addEventListener("click", downloadPng);
 
   setDefaults();
-  verifyBrowserModel();
+  calculateButton.disabled = true;
+  calculateLabel.textContent = "Loading and checking 20 frozen RF fits…";
+  window.RF_CALCULATOR_READY = (async () => {
+    try {
+      engine = await window.RFEngine.create(model);
+      await startWorker();
+      verifyBrowserModel();
+      if (!calculateButton.disabled) calculateLabel.textContent = "Calculate risk and generate SHAP";
+      return !calculateButton.disabled;
+    } catch (error) {
+      calculateButton.disabled = true;
+      calculateLabel.textContent = "Model loading failed";
+      showError(error.message || "The frozen model could not be loaded. Please refresh and retry.");
+      return false;
+    }
+  })();
 })();
